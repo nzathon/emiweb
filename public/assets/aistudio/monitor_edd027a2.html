@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px;background:#15171c;color:#e8e8e8;font-family:Arial,sans-serif;font-size:13px}
+h3{margin:14px 0 6px;font-size:14px;color:#9fc4ff}
+.note{color:#8bc5ff;font-size:12px;margin:6px 0;overflow-wrap:anywhere;min-height:16px}
+.small{color:#98a0ad;font-size:11px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{background:#2a2e38;color:#aab;border:1px solid #3d4350;border-radius:14px;padding:5px 9px;font-size:11px}
+.chip.on{background:#2f5d3a;color:#fff;border-color:#4f9d62}
+.box{background:#1e2128;border:1px solid #333a46;border-radius:8px;padding:8px;margin:8px 0}
+.hidden{display:none}
+.row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.lbl{width:46px;font-size:11px;color:#b8c0cc}
+.bar{flex:1;height:12px;background:#0d0f13;border:1px solid #3a4150;border-radius:6px;overflow:hidden;position:relative}
+.fill{height:100%;width:0}
+.bartxt{width:92px;text-align:right;font-size:11px;color:#cfd6e0}
+.pill{display:inline-block;background:#2a2e38;border:1px solid #3d4350;border-radius:10px;padding:3px 8px;margin:2px 4px 2px 0;font-size:11px}
+.feedrow{margin:4px 0}
+.feedname{color:#9fc4ff;font-size:11px;margin-top:6px}
+.cur{background:#0d0f13;border:1px solid #333a46;border-radius:6px;padding:6px;min-height:26px;overflow-wrap:anywhere}
+.hist{max-height:110px;overflow:auto;margin-top:4px;font-size:11px;color:#9aa3b0}
+.hist div{border-bottom:1px solid #232834;padding:2px 0;overflow-wrap:anywhere}
+/* ===== tampilan inventory ala Minecraft ===== */
+.inv{position:relative;width:100%;max-width:440px;margin:6px auto;background:#c6c6c6;border:3px solid;border-color:#ffffff #555555 #555555 #ffffff;border-radius:3px}
+.slot{position:absolute;background:#8b8b8b;border:2px solid;border-color:#373737 #ffffff #ffffff #373737;overflow:hidden}
+.slot.sel{outline:3px solid #ffd65a;outline-offset:-3px;z-index:2}
+.slot.held{box-shadow:inset 0 0 0 2px #4fc3ff}
+.ico{position:absolute;left:8%;top:8%;right:8%;bottom:8%}
+.ico img{position:absolute;left:0;top:0;width:100%;height:100%;image-rendering:pixelated}
+
+/* --- EFEK ENCHANTED GLINT (DIPERBARUI) --- */
+@keyframes glint {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.ico.enchanted::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0) 40%, rgba(160, 100, 255, 0.8) 50%, rgba(255,255,255,0) 60%);
+  background-size: 200% 200%;
+  animation: glint 2s linear infinite;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ph{position:absolute;left:0;top:0;right:0;bottom:0;border-radius:3px;color:#fff;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center}
+.cnt{position:absolute;right:2px;bottom:0;color:#fff;font-weight:bold;font-size:11px;text-shadow:1px 1px 0 #3a3a3a;z-index:4}
+.dur{position:absolute;left:10%;right:10%;bottom:3px;height:3px;background:#000;z-index:4}
+.dur div{height:100%}
+.hint{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:#6d6d6d;font-size:12px;font-weight:bold}
+.model{position:absolute;background:#1b1b1b;border:2px solid;border-color:#373737 #ffffff #ffffff #373737;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.model img{max-width:100%;max-height:100%;image-rendering:pixelated}
+.fig{position:relative;width:50%;height:80%}
+.fig div{position:absolute;background:#7aa7d8}
+.arrow{position:absolute;color:#555;font-size:20px;font-weight:bold;display:flex;align-items:center;justify-content:center}
+.curs{display:flex;align-items:center;gap:8px;margin:4px 0;min-height:30px}
+.curs .miniicon{position:relative;width:28px;height:28px;background:#8b8b8b;border:2px solid;border-color:#373737 #ffffff #ffffff #373737}
+/* ===== detail ===== */
+.dhead{display:flex;gap:10px;align-items:center}
+.dicon{position:relative;width:56px;height:56px;background:#8b8b8b;border:2px solid;border-color:#373737 #ffffff #ffffff #373737;flex:none}
+.dname{font-size:15px;font-weight:bold;overflow-wrap:anywhere}
+.dlore div{margin:1px 0;overflow-wrap:anywhere}
+.btns{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+button{background:#3b536f;color:#fff;border:0;border-radius:6px;padding:10px 4px;font-weight:bold;font-size:12px}
+button.danger{background:#913d43}
+button.alt{background:#4a4f5c}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:10px;color:#aab;max-height:220px;overflow:auto;background:#0d0f13;padding:6px;border-radius:6px;margin-top:6px}
+
+/* --- TOMBOL COPY GAYA SCREENSHOT --- */
+.copy-btn {
+  background: transparent;
+  color: #aab;
+  border: 0;
+  font-size: 12px;
+  font-family: sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  float: right;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.copy-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.copy-btn svg { width: 14px; height: 14px; fill: currentColor; }
+</style>
+</head>
+<body>
+
+<div class="chips" id="chips"></div>
+<div class="note" id="note">Menunggu bot...</div>
+
+<div id="secStatus" class="box hidden">
+  <h3 style="margin-top:0">Status</h3>
+  <div id="infoLine" class="small"></div>
+  <div class="row"><span class="lbl">HP</span><div class="bar"><div class="fill" id="hpFill" style="background:#d9473f"></div></div><span class="bartxt" id="hpTxt"></span></div>
+  <div class="row"><span class="lbl">Lapar</span><div class="bar"><div class="fill" id="foodFill" style="background:#d68a2c"></div></div><span class="bartxt" id="foodTxt"></span></div>
+  <div class="row"><span class="lbl">XP</span><div class="bar"><div class="fill" id="xpFill" style="background:#6ad24a"></div></div><span class="bartxt" id="xpTxt"></span></div>
+</div>
+
+<div id="secEffects" class="box hidden">
+  <h3 style="margin-top:0">Efek</h3>
+  <div id="effects"></div>
+</div>
+
+<div id="secBoss" class="box hidden">
+  <h3 style="margin-top:0">Bossbar</h3>
+  <div id="boss"></div>
+</div>
+
+<div id="secInv" class="box hidden">
+  <h3 style="margin-top:0" id="invTitle">Inventory</h3>
+  <div class="inv" id="invBox"></div>
+  <div class="curs" id="cursor"></div>
+  <div class="small" id="iconStat"></div>
+  <div class="small" id="iconFail"></div>
+  <div class="small" id="hint"></div>
+</div>
+
+<div id="secDetail" class="box hidden">
+  <h3 style="margin-top:0">Detail slot</h3>
+  <div class="dhead"><div class="dicon" id="dIcon"></div><div><div class="dname" id="dName">Pilih sebuah slot</div><div class="small" id="dSub"></div></div></div>
+  <div id="dEnch" class="small"></div>
+  <div class="dlore" id="dLore"></div>
+  <div class="btns" id="btns"></div>
+  <details>
+    <summary class="small" style="cursor:pointer; margin-bottom:6px;">Data mentah (untuk debug)</summary>
+    <button class="copy-btn" id="btnCopyRaw">
+      <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+      Copy
+    </button>
+    <div style="clear:both;"></div>
+    <pre id="dRaw"></pre>
+  </details>
+</div>
+
+<div id="secFeed" class="box hidden">
+  <h3 style="margin-top:0">Teks dari server</h3>
+  <div id="feed"></div>
+  <div class="btns"><button class="alt" id="clearFeed">Bersihkan riwayat</button></div>
+</div>
+
+<script>
+var cfg = {status:true,effects:true,boss:true,bar:true,title:true,subtitle:true,inv:true,icons:true,skin:true};
+var CHIPS = [
+  ['inv','Inventory'],['status','Status'],['effects','Efek'],['boss','Bossbar'],
+  ['bar','Action bar'],['title','Title'],['subtitle','Subtitle'],['icons','Ikon'],['skin','Skin']
+];
+var iconTpl = [];
+var skinTpl = [];
+var botName = 'Steve';
+var snap = null;
+var sel = -1;
+var slotEls = {};
+var iconCache = {};
+var iconStat = {ok:0, fail:0, builtin:0};
+var iconPending = {};
+var iconFailed = [];
+var lastIconSrc = '';
+var dblAction = 'left';
+var lastTap = {i:-1, t:0};
+var effectsList = [];
+var effectsAt = 0;
+var feedData = {bar:null, title:null, subtitle:null};
+var FEED_NAMES = {bar:'Action bar', title:'Title', subtitle:'Subtitle'};
+
+function $(id){ return document.getElementById(id); }
+function send(action, extra){
+  var p = extra || {};
+  p.action = action;
+  tab.send(p);
+}
+function el(tag, cls, text){
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = String(text);
+  return e;
+}
+function clear(node){ node.textContent = ''; }
+function note(t){ $('note').textContent = t || ''; }
+function pct(v){ return Math.max(0, Math.min(100, v)) + '%'; }
+
+function addSpans(parent, spans){
+  if (!spans) return;
+  for (var i = 0; i < spans.length; i++){
+    var s = spans[i];
+    var n = el('span', '', s.t);
+    if (s.c) n.style.color = s.c;
+    if (s.b) n.style.fontWeight = 'bold';
+    if (s.i) n.style.fontStyle = 'italic';
+    parent.appendChild(n);
+  }
+}
+function plainOf(spans){
+  var out = '';
+  if (spans) for (var i = 0; i < spans.length; i++) out += spans[i].t;
+  return out;
+}
+
+/* ---------- ikon ---------- */
+function hue(name){
+  var h = 0;
+  for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return h;
+}
+function abbr(name){
+  var parts = String(name).split('_');
+  var a = parts[0].charAt(0).toUpperCase();
+  var b = parts.length > 1 ? parts[parts.length - 1].charAt(0).toUpperCase() : parts[0].charAt(1);
+  return a + (b || '');
+}
+function ends(s, suf){ return s.length >= suf.length && s.substring(s.length - suf.length) === suf; }
+function cut(s, suf){ return s.substring(0, s.length - suf.length); }
+
+function iconNames(name){
+  var out = [];
+  function add(n){ if (n && out.indexOf(n) < 0) out.push(n); }
+  add(name);
+  
+  if (name === 'chest' || name === 'trapped_chest' || name === 'ender_chest') {
+    add(name + '_front');
+  } else if (name === 'piston' || name === 'sticky_piston') {
+    add(name + '_top');
+  } else if (name === 'furnace' || name === 'blast_furnace' || name === 'smoker') {
+    add(name + '_front');
+  } else if (name === 'crafting_table') {
+    add(name + '_front');
+  } else if (name === 'compass' || name === 'recovery_compass' || name === 'clock') {
+    add(name + '_00');
+  }
+
+  var rules = [
+    ['_stained_glass_pane', ['_stained_glass']],
+    ['_stairs', ['_planks', '', '_block', 's', '_bricks']],
+    ['_slab', ['_planks', '', '_block', 's', '_bricks']],
+    ['_wall', ['', '_block', 's', '_bricks']],
+    ['_fence_gate', ['_planks']],
+    ['_fence', ['_planks', '']],
+    ['_button', ['_planks', '']],
+    ['_pressure_plate', ['_planks', '', '_block']],
+    ['_carpet', ['_wool', '']],
+    ['_wood', ['_log']],
+    ['_hyphae', ['_stem']]
+  ];
+  for (var i = 0; i < rules.length; i++){
+    if (ends(name, rules[i][0])){
+      var base = cut(name, rules[i][0]);
+      for (var j = 0; j < rules[i][1].length; j++) add(base + rules[i][1][j]);
+    }
+  }
+  if (name === 'glass_pane') add('glass');
+  
+  var first = out.slice();
+  for (var k = 0; k < first.length; k++){ 
+    add(first[k] + '_front'); add(first[k] + '_side'); add(first[k] + '_top'); 
+  }
+  return out;
+}
+
+function renderHead3DDataUrl(img){
+  var w = img.naturalWidth || img.width;
+  var h = img.naturalHeight || img.height;
+  if (!w || !h || w < 64 || h < 32) return '';
+
+  var srcCanvas = document.createElement('canvas');
+  srcCanvas.width = w;
+  srcCanvas.height = h;
+  var sctx = srcCanvas.getContext('2d');
+  if (!sctx) return '';
+  sctx.drawImage(img, 0, 0);
+
+  var skinData;
+  try {
+    skinData = sctx.getImageData(0, 0, w, h).data;
+  } catch (e) {
+    return '';
+  }
+
+  var size = 64;
+  var outCanvas = document.createElement('canvas');
+  outCanvas.width = size;
+  outCanvas.height = size;
+  var octx = outCanvas.getContext('2d');
+  if (!octx) return '';
+
+  var outImg = octx.createImageData(size, size);
+  var out = outImg.data;
+  var texScale = w / 64;
+
+  function blendPixel(idx, sr, sg, sb, sa){
+    if (sa <= 0) return;
+    var da = out[idx + 3] / 255;
+    var sAlpha = sa / 255;
+    var outA = sAlpha + da * (1 - sAlpha);
+    if (outA <= 0) return;
+    out[idx] = Math.round((sr * sAlpha + out[idx] * da * (1 - sAlpha)) / outA);
+    out[idx + 1] = Math.round((sg * sAlpha + out[idx + 1] * da * (1 - sAlpha)) / outA);
+    out[idx + 2] = Math.round((sb * sAlpha + out[idx + 2] * da * (1 - sAlpha)) / outA);
+    out[idx + 3] = Math.round(outA * 255);
+  }
+
+  function drawFace(srcOx, srcOy, p00, p10, p01, shade){
+    var ax = p10[0] - p00[0], ay = p10[1] - p00[1];
+    var bx = p01[0] - p00[0], by = p01[1] - p00[1];
+    var det = ax * by - ay * bx;
+    if (Math.abs(det) < 1e-6) return;
+
+    var p11 = [p10[0] + bx, p10[1] + by];
+    var minX = Math.max(0, Math.floor(Math.min(p00[0], p10[0], p01[0], p11[0])));
+    var maxX = Math.min(size - 1, Math.ceil(Math.max(p00[0], p10[0], p01[0], p11[0])));
+    var minY = Math.max(0, Math.floor(Math.min(p00[1], p10[1], p01[1], p11[1])));
+    var maxY = Math.min(size - 1, Math.ceil(Math.max(p00[1], p10[1], p01[1], p11[1])));
+
+    var faceTexW = Math.round(8 * texScale);
+    var faceTexOx = Math.round(srcOx * texScale);
+    var faceTexOy = Math.round(srcOy * texScale);
+
+    for (var py = minY; py <= maxY; py++){
+      for (var px = minX; px <= maxX; px++){
+        var dx = px + 0.5 - p00[0];
+        var dy = py + 0.5 - p00[1];
+        var u = (dx * by - dy * bx) / det;
+        var v = (ax * dy - ay * dx) / det;
+        if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+
+        var tx = Math.min(faceTexW - 1, Math.max(0, Math.floor(u * faceTexW)));
+        var ty = Math.min(faceTexW - 1, Math.max(0, Math.floor(v * faceTexW)));
+        var sx = faceTexOx + tx;
+        var sy = faceTexOy + ty;
+        if (sx >= w || sy >= h) continue;
+
+        var sIdx = (sy * w + sx) * 4;
+        var sa = skinData[sIdx + 3];
+        if (sa === 0) continue;
+
+        var sr = Math.min(255, Math.round(skinData[sIdx] * shade));
+        var sg = Math.min(255, Math.round(skinData[sIdx + 1] * shade));
+        var sb = Math.min(255, Math.round(skinData[sIdx + 2] * shade));
+        blendPixel((py * size + px) * 4, sr, sg, sb, sa);
+      }
+    }
+  }
+
+  function renderCube(scale, topUv, sideLeftUv, frontRightUv){
+    var cx = 32, cy = 32;
+    var W = 23 * scale, H = 11.5 * scale, D = 26 * scale;
+    var topY = cy - H - D * 0.5;
+    var cTop = [cx, topY];
+    var cLeft = [cx - W, topY + H];
+    var cRight = [cx + W, topY + H];
+    var cCenter = [cx, topY + 2 * H];
+    var bLeft = [cx - W, topY + H + D];
+    var bCenter = [cx, topY + 2 * H + D];
+
+    drawFace(topUv[0], topUv[1], cLeft, cTop, cCenter, 1.0);
+    drawFace(sideLeftUv[0], sideLeftUv[1], cLeft, cCenter, bLeft, 0.78);
+    drawFace(frontRightUv[0], frontRightUv[1], cCenter, cRight, bCenter, 0.94);
+  }
+
+  renderCube(1.0, [8, 0], [0, 8], [8, 8]);
+
+  var hatFaces = [[40, 0], [32, 8], [40, 8]];
+  var hatHasPixels = false;
+  var hatAllSolidBlack = true;
+  for (var f = 0; f < hatFaces.length; f++){
+    var ox = hatFaces[f][0], oy = hatFaces[f][1];
+    for (var dy = 0; dy < 8; dy++){
+      for (var dx = 0; dx < 8; dx++){
+        var sx = Math.min(w - 1, Math.round((ox + dx) * texScale));
+        var sy = Math.min(h - 1, Math.round((oy + dy) * texScale));
+        var idx = (sy * w + sx) * 4;
+        var a = skinData[idx + 3];
+        if (a > 0) hatHasPixels = true;
+        if (a !== 255 || skinData[idx] !== 0 || skinData[idx + 1] !== 0 || skinData[idx + 2] !== 0){
+          hatAllSolidBlack = false;
+        }
+      }
+    }
+  }
+  if (hatHasPixels && !hatAllSolidBlack){
+    renderCube(1.08, [40, 0], [32, 8], [40, 8]);
+  }
+
+  octx.putImageData(outImg, 0, 0);
+  try {
+    return outCanvas.toDataURL('image/png');
+  } catch (e) {
+    return '';
+  }
+}
+
+function drawHead3DCanvasFallback(img, host, ph){
+  var w = img.naturalWidth || img.width;
+  var h = img.naturalHeight || img.height;
+  if (!w || !h || w < 64 || h < 32) return;
+  var canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  canvas.style.position = 'absolute';
+  canvas.style.left = '0';
+  canvas.style.top = '0';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.imageRendering = 'pixelated';
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.imageSmoothingEnabled = false;
+  var texScale = w / 64;
+  var sw = 8 * texScale;
+
+  function face(sx, sy, p00, p10, p01){
+    ctx.setTransform(
+      (p10[0] - p00[0]) / 8, (p10[1] - p00[1]) / 8,
+      (p01[0] - p00[0]) / 8, (p01[1] - p00[1]) / 8,
+      p00[0], p00[1]
+    );
+    ctx.drawImage(img, sx * texScale, sy * texScale, sw, sw, 0, 0, 8, 8);
+  }
+  function cube(scale, topUv, sideLeftUv, frontRightUv){
+    var cx = 32, cy = 32, W = 23 * scale, H = 11.5 * scale, D = 26 * scale;
+    var topY = cy - H - D * 0.5;
+    face(topUv[0], topUv[1], [cx - W, topY + H], [cx, topY], [cx, topY + 2 * H]);
+    face(sideLeftUv[0], sideLeftUv[1], [cx - W, topY + H], [cx, topY + 2 * H], [cx - W, topY + H + D]);
+    face(frontRightUv[0], frontRightUv[1], [cx, topY + 2 * H], [cx + W, topY + H], [cx, topY + 2 * H + D]);
+  }
+  cube(1.0, [8, 0], [0, 8], [8, 8]);
+  cube(1.08, [40, 0], [32, 8], [40, 8]);
+  ph.style.display = 'none';
+  host.appendChild(canvas);
+}
+
+function resolveIcon(name, hash, done){
+  var cacheKey = hash ? 'hash:' + hash : 'name:' + name;
+  if (iconCache[cacheKey] !== undefined){ done(iconCache[cacheKey]); return; }
+  if (iconPending[cacheKey]){ iconPending[cacheKey].push(done); return; }
+  iconPending[cacheKey] = [done];
+  
+  function finish(url, isBuiltin){
+    iconCache[cacheKey] = url;
+    if (url && isBuiltin) iconStat.builtin++; else if (url) iconStat.ok++; else { iconStat.fail++; iconFailed.push(name); }
+    var cbs = iconPending[cacheKey];
+    delete iconPending[cacheKey];
+    for (var i = 0; i < cbs.length; i++) cbs[i](url);
+    showIconStat();
+  }
+
+  if (hash) {
+    var skinUrl = 'https://textures.minecraft.net/texture/' + hash;
+    var headImg = new Image();
+    headImg.crossOrigin = 'anonymous';
+    headImg.onload = function(){
+      var dataUrl = renderHead3DDataUrl(headImg);
+      finish(dataUrl || skinUrl, true);
+    };
+    headImg.onerror = function(){
+      var rawImg = new Image();
+      rawImg.onload = function(){ finish(skinUrl, true); };
+      rawImg.onerror = function(){ finish('', false); };
+      rawImg.src = skinUrl;
+    };
+    headImg.src = skinUrl;
+    return;
+  }
+
+  var urls = [];
+  var names = iconNames(name);
+  for (var a = 0; a < names.length; a++) {
+    for (var b = 0; b < iconTpl.length; b++) {
+      urls.push(iconTpl[b].split('{name}').join(names[a]));
+    }
+  }
+  
+  var k = 0;
+  function tryNext(){
+    if (k >= urls.length){
+      finish('', false);
+      return;
+    }
+    var probe = document.createElement('img');
+    probe.onload = function(){ finish(urls[k]); };
+    probe.onerror = function(){ k++; tryNext(); };
+    probe.src = urls[k];
+  }
+  tryNext();
+}
+
+function makeIcon(name, hash, host, isEnchanted){
+  if (isEnchanted) host.className += ' enchanted';
+  var ph = el('div', 'ph', abbr(name));
+  ph.style.background = 'hsl(' + hue(name) + ',45%,38%)';
+  host.appendChild(ph);
+  if (!cfg.icons || (!hash && !iconTpl.length)) return;
+  
+  resolveIcon(name, hash, function(url){
+    if (!url) return;
+    if (url.indexOf('textures.minecraft.net/texture/') >= 0){
+      var fbImg = new Image();
+      fbImg.onload = function(){ drawHead3DCanvasFallback(fbImg, host, ph); };
+      fbImg.src = url;
+      return;
+    }
+    var img = el('img');
+    img.style.display = 'none';
+    img.onload = function(){ img.style.display = ''; ph.style.display = 'none'; };
+    img.src = url;
+    host.appendChild(img);
+  });
+}
+function resetIcons(){
+  iconCache = {};
+  iconPending = {};
+  iconFailed = [];
+  iconStat = {ok:0, fail:0, builtin:0};
+  showIconStat();
+}
+function showIconStat(){
+  var box = $('iconStat');
+  var fb = $('iconFail');
+  if (!cfg.icons){ box.textContent = ''; fb.textContent = ''; return; }
+  box.textContent = 'Ikon: ' + iconStat.ok + ' internet, ' + iconStat.builtin + ' head, ' + iconStat.fail + ' gagal.';
+  fb.textContent = iconFailed.length ? 'Gagal memuat: ' + iconFailed.slice(0, 10).join(', ') + (iconFailed.length > 10 ? ' ...' : '') : '';
+}
+
+/* ---------- chips ---------- */
+function renderChips(){
+  var box = $('chips');
+  clear(box);
+  for (var i = 0; i < CHIPS.length; i++){
+    (function(key, label){
+      var c = el('div', 'chip' + (cfg[key] ? ' on' : ''), label);
+      c.onclick = function(){ send('toggle', {key:key}); };
+      box.appendChild(c);
+    })(CHIPS[i][0], CHIPS[i][1]);
+  }
+  $('secStatus').className = 'box' + (cfg.status ? '' : ' hidden');
+  $('secEffects').className = 'box' + (cfg.effects ? '' : ' hidden');
+  $('secBoss').className = 'box' + (cfg.boss ? '' : ' hidden');
+  $('secInv').className = 'box' + (cfg.inv ? '' : ' hidden');
+  $('secDetail').className = 'box' + (cfg.inv ? '' : ' hidden');
+  $('secFeed').className = 'box' + ((cfg.bar || cfg.title || cfg.subtitle) ? '' : ' hidden');
+}
+
+/* ---------- status ---------- */
+function renderStatus(s){
+  $('infoLine').textContent = s.info || '';
+  $('hpFill').style.width = pct((s.hp || 0) / 20 * 100);
+  $('hpTxt').textContent = (s.hp == null ? '-' : s.hp.toFixed(1)) + ' / 20';
+  $('foodFill').style.width = pct((s.food || 0) / 20 * 100);
+  $('foodTxt').textContent = (s.food == null ? '-' : s.food) + ' / 20  sat ' + (s.sat == null ? '-' : s.sat.toFixed(1));
+  $('xpFill').style.width = pct((s.xp ? s.xp.progress : 0) * 100);
+  $('xpTxt').textContent = 'Lv ' + (s.xp ? s.xp.level : 0) + '  (' + (s.xp ? Math.round(s.xp.progress * 100) : 0) + '%)';
+  effectsList = s.effects || [];
+  effectsAt = Date.now();
+  renderEffects();
+  renderBoss(s.boss || []);
+}
+function fmtTime(ms){
+  if (ms == null) return '';
+  var t = Math.max(0, Math.round(ms / 1000));
+  var m = Math.floor(t / 60);
+  var r = t % 60;
+  return m + ':' + (r < 10 ? '0' : '') + r;
+}
+function renderEffects(){
+  var box = $('effects');
+  clear(box);
+  if (!effectsList.length){ box.appendChild(el('div', 'small', 'Tidak ada efek aktif')); return; }
+  var spent = Date.now() - effectsAt;
+  for (var i = 0; i < effectsList.length; i++){
+    var e = effectsList[i];
+    var left = e.ms == null ? null : e.ms - spent;
+    box.appendChild(el('span', 'pill', e.name + (left == null ? '' : '  ' + fmtTime(left))));
+  }
+}
+function renderBoss(list){
+  var box = $('boss');
+  clear(box);
+  if (!list.length){ box.appendChild(el('div', 'small', 'Tidak ada bossbar')); return; }
+  for (var i = 0; i < list.length; i++){
+    var b = list[i];
+    var title = el('div', '');
+    addSpans(title, b.title);
+    box.appendChild(title);
+    var bar = el('div', 'bar');
+    var fill = el('div', 'fill');
+    fill.style.width = pct(b.hp * 100);
+    fill.style.background = b.color || '#a45bd6';
+    bar.appendChild(fill);
+    box.appendChild(bar);
+  }
+}
+
+/* ---------- teks dari server ---------- */
+function renderFeed(){
+  var box = $('feed');
+  clear(box);
+  var order = ['bar', 'title', 'subtitle'];
+  for (var i = 0; i < order.length; i++){
+    var key = order[i];
+    if (!cfg[key]) continue;
+    var d = feedData[key] || {cur:null, hist:[]};
+    box.appendChild(el('div', 'feedname', FEED_NAMES[key]));
+    var cur = el('div', 'cur');
+    if (d.cur && d.cur.length) addSpans(cur, d.cur); else cur.appendChild(el('span', 'small', '(kosong)'));
+    box.appendChild(cur);
+    var hist = el('div', 'hist');
+    for (var j = d.hist.length - 1; j >= 0; j--){
+      var row = el('div', '');
+      row.appendChild(el('span', 'small', d.hist[j].time + '  '));
+      addSpans(row, d.hist[j].spans);
+      hist.appendChild(row);
+    }
+    box.appendChild(hist);
+  }
+}
+
+/* ---------- inventory ---------- */
+function layoutFor(s){
+  var L = {w:176, h:166, slots:[], model:null, arrow:null, title:''};
+  var r, c, i;
+  if (!s.gui){
+    var hints = ['H', 'C', 'L', 'B'];
+    for (i = 0; i < 4; i++) L.slots.push({i:5 + i, x:8, y:8 + 18 * i, hint:hints[i]});
+    L.slots.push({i:45, x:77, y:62, hint:'O'});
+    L.slots.push({i:1, x:98, y:18});
+    L.slots.push({i:2, x:116, y:18});
+    L.slots.push({i:3, x:98, y:36});
+    L.slots.push({i:4, x:116, y:36});
+    L.slots.push({i:0, x:154, y:28});
+    L.model = {x:26, y:8, w:49, h:70};
+    L.arrow = {x:134, y:28, w:18, h:18};
+    for (r = 0; r < 3; r++) for (c = 0; c < 9; c++) L.slots.push({i:9 + r * 9 + c, x:8 + 18 * c, y:84 + 18 * r});
+    for (c = 0; c < 9; c++) L.slots.push({i:36 + c, x:8 + 18 * c, y:142});
+    L.title = 'Inventory pemain';
+  } else {
+    var n = s.inv;
+    var rows = Math.max(1, Math.ceil(n / 9));
+    for (i = 0; i < n; i++) L.slots.push({i:i, x:8 + 18 * (i % 9), y:18 + 18 * Math.floor(i / 9)});
+    var invY = 18 + rows * 18 + 14;
+    var hotY = invY + 58;
+    for (r = 0; r < 3; r++) for (c = 0; c < 9; c++) L.slots.push({i:s.inv + r * 9 + c, x:8 + 18 * c, y:invY + 18 * r});
+    for (c = 0; c < 9; c++) L.slots.push({i:s.hot + c, x:8 + 18 * c, y:hotY});
+    L.h = hotY + 24;
+    L.title = 'Menu server: ' + (s.title || '(tanpa judul)');
+  }
+  return L;
+}
+function skinUrls(){
+  var out = [];
+  for (var i = 0; i < skinTpl.length; i++) out.push(skinTpl[i].split('{name}').join(botName));
+  return out;
+}
+function buildFigure(host){
+  var fig = el('div', 'fig');
+  var parts = [[30, 0, 40, 22], [25, 24, 50, 36], [5, 24, 18, 36], [77, 24, 18, 36], [25, 62, 24, 36], [51, 62, 24, 36]];
+  for (var i = 0; i < parts.length; i++){
+    var d = el('div', '');
+    d.style.left = parts[i][0] + '%'; d.style.top = parts[i][1] + '%';
+    d.style.width = parts[i][2] + '%'; d.style.height = parts[i][3] + '%';
+    fig.appendChild(d);
+  }
+  host.appendChild(fig);
+}
+function buildModel(host){
+  buildFigure(host);
+  if (!cfg.skin) return;
+  var urls = skinUrls();
+  if (!urls.length) return;
+  var img = el('img');
+  img.style.display = 'none';
+  var k = 0;
+  function next(){
+    if (k >= urls.length) return;
+    img.onload = function(){ img.style.display = ''; var f = host.firstChild; if (f) f.style.display = 'none'; };
+    img.onerror = function(){ k++; next(); };
+    img.src = urls[k];
+  }
+  host.appendChild(img);
+  next();
+}
+function drawSlot(box, L, d){
+  var item = snap.slots[d.i] || null;
+  var e = el('div', 'slot');
+  e.style.left = pct(d.x / L.w * 100); e.style.top = pct(d.y / L.h * 100);
+  e.style.width = pct(18 / L.w * 100); e.style.height = pct(18 / L.h * 100);
+  var isHeld = !snap.gui && d.i === 36 + snap.held || (snap.gui && d.i === snap.hot + snap.held);
+  if (isHeld) e.className += ' held';
+  if (d.i === sel) e.className += ' sel';
+  if (item){
+    var ico = el('div', 'ico');
+    makeIcon(item.n, item.hash, ico, item.e);
+    e.appendChild(ico);
+    if (item.c > 1) e.appendChild(el('span', 'cnt', item.c));
+    if (item.d && item.d[0] > 0){
+      var dur = el('div', 'dur'); var f = el('div', '');
+      var ratio = 1 - item.d[0] / item.d[1];
+      f.style.width = pct(ratio * 100);
+      f.style.background = ratio > 0.5 ? '#4cd964' : (ratio > 0.2 ? '#ffd60a' : '#e5493a');
+      dur.appendChild(f); e.appendChild(dur);
+    }
+  } else if (d.hint){
+    e.appendChild(el('span', 'hint', d.hint));
+  }
+  e.onclick = function(){ tapSlot(d.i); };
+  slotEls[d.i] = e;
+  box.appendChild(e);
+}
+function renderInv(){
+  if (!snap) return;
+  var box = $('invBox');
+  clear(box);
+  slotEls = {};
+  var L = layoutFor(snap);
+  $('invTitle').textContent = L.title;
+  box.style.paddingTop = pct(L.h / L.w * 100);
+  if (L.model){
+    var m = el('div', 'model');
+    m.style.left = pct(L.model.x / L.w * 100); m.style.top = pct(L.model.y / L.h * 100);
+    m.style.width = pct(L.model.w / L.w * 100); m.style.height = pct(L.model.h / L.h * 100);
+    buildModel(m); box.appendChild(m);
+  }
+  if (L.arrow){
+    var a = el('div', 'arrow', '>');
+    a.style.left = pct(L.arrow.x / L.w * 100); a.style.top = pct(L.arrow.y / L.h * 100);
+    a.style.width = pct(L.arrow.w / L.w * 100); a.style.height = pct(L.arrow.h / L.h * 100);
+    box.appendChild(a);
+  }
+  for (var i = 0; i < L.slots.length; i++) drawSlot(box, L, L.slots[i]);
+  renderCursor();
+}
+function renderCursor(){
+  var box = $('cursor');
+  clear(box);
+  if (!snap || !snap.cursor){ box.appendChild(el('span', 'small', 'Kursor kosong')); return; }
+  var mini = el('div', 'miniicon'); var mw = el('div', 'ico');
+  mini.appendChild(mw); makeIcon(snap.cursor.n, snap.cursor.hash, mw, snap.cursor.e);
+  box.appendChild(mini);
+  box.appendChild(el('span', '', 'Kursor memegang: ' + (snap.cursor.t || snap.cursor.n) + ' x' + snap.cursor.c));
+}
+var DBL_LABEL = {left:'klik kiri', right:'klik kanan', middle:'klik tengah', shift:'pindah cepat (shift)', off:'nonaktif'};
+function showHint(){
+  $('hint').textContent = 'Ketuk 1x = lihat detail. Ketuk 2x = ' + (DBL_LABEL[dblAction] || dblAction) + '.';
+}
+function tapSlot(i){
+  var now = Date.now();
+  if (dblAction !== 'off' && lastTap.i === i && now - lastTap.t < 400){
+    lastTap.i = -1; send('click', {slot:i, kind:dblAction}); return;
+  }
+  lastTap.i = i; lastTap.t = now; pick(i);
+}
+function pick(i){
+  sel = i;
+  for (var k in slotEls) slotEls[k].className = slotEls[k].className.split(' sel').join('');
+  if (slotEls[i]) slotEls[i].className += ' sel';
+  send('detail', {slot:i});
+}
+function renderDetail(d){
+  var icon = $('dIcon'); clear(icon); var name = $('dName'); clear(name);
+  $('dSub').textContent = ''; $('dEnch').textContent = ''; clear($('dLore')); $('dRaw').textContent = '';
+  if (!d || !d.item){ name.textContent = d ? ('Slot ' + d.slot + ' kosong') : 'Pilih sebuah slot'; renderButtons(d ? d.slot : -1, null); return; }
+  var it = d.item; var iw = el('div', 'ico'); icon.appendChild(iw); makeIcon(it.id, it.hash, iw, it.e);
+  if (it.title && it.title.length) addSpans(name, it.title); else name.textContent = it.label || it.id;
+  var sub = 'minecraft:' + it.id + '  |  jumlah ' + it.count + '  |  slot ' + d.slot;
+  if (it.dur) sub += '  |  durability ' + (it.dur[1] - it.dur[0]) + '/' + it.dur[1];
+  $('dSub').textContent = sub;
+  if (it.ench && it.ench.length){
+    var parts = [];
+    for (var i = 0; i < it.ench.length; i++) parts.push(it.ench[i].name + ' ' + it.ench[i].lvl);
+    $('dEnch').textContent = 'Enchant: ' + parts.join(', ');
+  }
+  var lore = $('dLore'); var lines = it.lore || [];
+  for (var j = 0; j < lines.length; j++){ var row = el('div', ''); addSpans(row, lines[j]); if (!row.firstChild) row.appendChild(el('span', '', ' ')); lore.appendChild(row); }
+  if (!lines.length) lore.appendChild(el('div', 'small', '(tidak ada lore)'));
+  $('dRaw').textContent = it.raw || ''; renderButtons(d.slot, it);
+}
+function renderButtons(slot, it){
+  var box = $('btns'); clear(box); if (slot < 0) return;
+  function add(label, kind, cls){
+    var b = el('button', cls || '', label);
+    b.onclick = function(){ send('click', {slot:slot, kind:kind}); }; box.appendChild(b);
+  }
+  add('Klik kiri', 'left'); add('Klik kanan', 'right'); add('Klik tengah', 'middle');
+  add('Pindah cepat', 'shift'); add('Buang 1', 'drop1', 'alt'); add('Buang semua', 'dropall', 'danger'); add('Tukar offhand', 'offhand', 'alt');
+  var hot = -1;
+  if (snap){ if (!snap.gui && slot >= 36 && slot <= 44) hot = slot - 36; if (snap.gui && slot >= snap.hot && slot <= snap.hot + 8) hot = slot - snap.hot; }
+  if (hot >= 0){
+    var b1 = el('button', '', 'Pilih hotbar ' + (hot + 1)); b1.onclick = function(){ send('select', {slot:hot}); }; box.appendChild(b1);
+    var b2 = el('button', '', 'Pakai item'); b2.onclick = function(){ send('use', {slot:hot}); }; box.appendChild(b2);
+  }
+  if (snap && snap.gui){ var b3 = el('button', 'danger', 'Tutup menu'); b3.onclick = function(){ send('close'); }; box.appendChild(b3); }
+}
+
+$('clearFeed').onclick = function(){ send('clearFeed'); };
+
+// --- LOGIKA COPY DATA MENTAH ---
+$('btnCopyRaw').onclick = function() {
+  var rawText = $('dRaw').textContent;
+  if (!rawText) return;
+  
+  var doCopy = function() {
+    var btn = $('btnCopyRaw');
+    var oldHTML = btn.innerHTML;
+    btn.innerHTML = '✅ Tersalin!';
+    btn.style.color = '#7fd67f';
+    setTimeout(function() {
+      btn.innerHTML = oldHTML;
+      btn.style.color = '';
+    }, 2000);
+  };
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(rawText).then(doCopy).catch(function() {
+      fallbackCopy();
+    });
+  } else {
+    fallbackCopy();
+  }
+
+  function fallbackCopy() {
+    var textArea = document.createElement("textarea");
+    textArea.value = rawText;
+    textArea.style.position = "fixed";
+    textArea.style.top = "-999999px";
+    textArea.style.left = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      doCopy();
+    } catch (err) {
+      alert('Gagal menyalin');
+    }
+    textArea.remove();
+  }
+};
+
+tab.onMessage(function(m){
+  if (!m) return;
+  if (m.type === 'cfg'){
+    for (var k in m.cfg) cfg[k] = m.cfg[k];
+    var srcKey = JSON.stringify(m.iconSrc || []);
+    if (srcKey !== lastIconSrc){ lastIconSrc = srcKey; iconTpl = m.iconSrc || []; resetIcons(); }
+    skinTpl = m.skinSrc || skinTpl;
+    botName = m.name || botName;
+    if (m.dbl) dblAction = m.dbl;
+    
+    showHint(); renderChips(); renderFeed(); if (snap) renderInv();
+  }
+  if (m.type === 'inv'){ snap = m; if (sel < 0) sel = -1; renderInv(); }
+  if (m.type === 'status') renderStatus(m);
+  if (m.type === 'feed'){ feedData = m.feed; renderFeed(); }
+  if (m.type === 'detail') renderDetail(m);
+  if (m.type === 'note') note(m.text);
+});
+
+renderChips(); renderEffects(); renderCursor(); showHint(); renderDetail(null);
+setInterval(renderEffects, 1000);
+send('ready');
+</script>
+</body>
+</html>

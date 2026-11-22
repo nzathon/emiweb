@@ -1,0 +1,6 @@
+{
+  "name": "EMI Web",
+  "description": "Web-based Minecraft EMI recipe viewer, item index, and interactive crafting tree calculator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
